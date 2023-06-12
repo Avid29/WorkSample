@@ -1,7 +1,27 @@
 // Adam Dernis 2023
 
+//
+//                                    Excerpt Summary
+// ----------------------------------------------------------------------------
+// 
+//      This is table of mips instruction patterns, metadata, and registers.
+// It is included for clarity in understanding InstructionParser.cs.
+//
+// ----------------------------------------------------------------------------
+// 
+// This is an excerpt from my MIPS.Interpreter project on GitHub.
 
-namespace WorkSample;
+// The full project can be found here:
+// https://github.com/Avid29/MIPS.Interpreter
+//
+// A link to the active file is available here:
+// https://github.com/Avid29/MIPS.Interpreter/blob/master/src/MIPS.Assembler/Helpers/ConstantTables.cs
+//
+// And a permalink to when this excerpt was taken is available here:
+// https://github.com/Avid29/MIPS.Interpreter/blob/0d9faabcd562a5a939110c67bbc870940426d6d0/src/MIPS.Assembler/Helpers/ConstantTables.cs
+// 
+
+namespace WorkSample.MIPS;
 
 /// <summary>
 /// A class containing constant tables for parsing lookup.

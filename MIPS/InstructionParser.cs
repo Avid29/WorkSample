@@ -19,9 +19,21 @@
 // are notes through out the code dropping reminders of problems that may arise once errors
 // are implemented.
 //
+// ----------------------------------------------------------------------------
+// 
+// This is an excerpt from my MIPS.Interpreter project on GitHub.
+
+// The full project can be found here:
+// https://github.com/Avid29/MIPS.Interpreter
+//
+// A link to the active file is available here:
+// https://github.com/Avid29/MIPS.Interpreter/blob/master/src/MIPS.Assembler/Parsers/InstructionParser.cs
+//
+// And a permalink to when this excerpt was taken is available here:
+// https://github.com/Avid29/MIPS.Interpreter/blob/0d9faabcd562a5a939110c67bbc870940426d6d0/src/MIPS.Assembler/Parsers/InstructionParser.cs
 // 
 
-namespace WorkSample;
+namespace WorkSample.MIPS;
 
 /// <summary>
 /// A struct for parsing instructions.
