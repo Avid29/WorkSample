@@ -22,7 +22,7 @@
 // ----------------------------------------------------------------------------
 // 
 // This is an excerpt from my MIPS.Interpreter project on GitHub.
-
+//
 // The full project can be found here:
 // https://github.com/Avid29/MIPS.Interpreter
 //

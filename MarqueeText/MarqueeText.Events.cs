@@ -10,7 +10,7 @@
 // ----------------------------------------------------------------------------
 // 
 // This is an excerpt from the Windows Community Toolkit Labs.
-
+//
 // The full project can be found here:
 // https://github.com/CommunityToolkit/Labs-Windows
 //
