@@ -4,7 +4,7 @@
 //                                    Excerpt Summary
 // ----------------------------------------------------------------------------
 // 
-//      This is table of mips instruction patterns, metadata, and registers.
+//      This is a table of mips instruction patterns, metadata, and registers.
 // It is included for clarity in understanding InstructionParser.cs.
 //
 // ----------------------------------------------------------------------------
