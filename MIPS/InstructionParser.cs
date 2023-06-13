@@ -11,13 +11,9 @@
 //
 //      The ExpressionParser also needs access to the symbol and macro table, so the
 // ObjectModuleConstructor is passed through the constructor into the ExpressionParser.
-// This is an optional argument though, to allow for tests on the InstructionParser
-// without creating an object module. The expressions simply won't contain symbols
-// or macros.
-//
-//      At this stage, it throws exceptions in place of logging errors. However, there
-// are notes through out the code dropping reminders of problems that may arise once errors
-// are implemented.
+// This is an optional argument though, to allow for testing on the InstructionParser
+// without creating an object module. The expressions simply won't be able to contain
+// symbols or macros.
 //
 // ----------------------------------------------------------------------------
 // 
@@ -30,7 +26,7 @@
 // https://github.com/Avid29/MIPS.Interpreter/blob/master/src/MIPS.Assembler/Parsers/InstructionParser.cs
 //
 // And a permalink to when this excerpt was taken is available here:
-// https://github.com/Avid29/MIPS.Interpreter/blob/0d9faabcd562a5a939110c67bbc870940426d6d0/src/MIPS.Assembler/Parsers/InstructionParser.cs
+// https://github.com/Avid29/MIPS.Interpreter/blob/99e84f2b37eb0c64a145bde79f31144b40f63c67/src/MIPS.Assembler/Parsers/InstructionParser.cs
 // 
 
 namespace WorkSample.MIPS;
@@ -40,6 +36,7 @@ namespace WorkSample.MIPS;
 /// </summary>
 public struct InstructionParser
 {
+    private ILogger? _logger;
     private ExpressionParser _expParser;
 
     private InstructionMetadata _meta;
@@ -56,17 +53,17 @@ public struct InstructionParser
     /// <summary>
     /// Initializes a new instance of the <see cref="InstructionParser"/> struct.
     /// </summary>
-    public InstructionParser() : this(null)
+    public InstructionParser() : this(null, null)
     {
-
     }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="InstructionParser"/> struct.
     /// </summary>
-    public InstructionParser(ObjectModuleConstructor? obj)
+    public InstructionParser(ObjectModuleConstructor? obj, ILogger? logger)
     {
-        _expParser = new ExpressionParser(obj);
+        _logger = logger;
+        _expParser = new ExpressionParser(obj, logger);
         _meta = default;
         _opCode = default;
         _funcCode = default;
@@ -79,25 +76,28 @@ public struct InstructionParser
     }
 
     /// <summary>
-    /// Parses an instruction from a name and a list of arguments.
+    /// Attempts to parse an instruction from a name and a list of arguments.
     /// </summary>
     /// <param name="name">The instruction name.</param>
     /// <param name="args">The instruction arguments.</param>
-    /// <returns>An <see cref="Instruction"/>.</returns>
-    public Instruction Parse(string name, string[] args)
+    /// <param name="instruction">The <see cref="Instruction"/>.</param>
+    /// <returns>Whether or not an instruction was parsed.</returns>
+    public bool TryParse(string name, string[] args, out Instruction instruction)
     {
+        instruction = default;
+
         // Get instruction metadata from name
         if (!ConstantTables.TryGetInstruction(name, out _meta))
         {
-            // TODO: Log error
-            ThrowHelper.ThrowInvalidDataException($"Instruction named '{name}' could not be found.");
+            _logger?.Log(Severity.Error, LogId.InvalidInstructionName, $"Instruction named '{name}' could not be found.");
+            return false;
         }
 
         // Assert proper argument count for instruction
         if (args.Length != _meta.ArgumentPattern.Length)
         {
-            // TODO: Log error
-            ThrowHelper.ThrowArgumentException($"Instruction '{name}' had {args.Length} arguments instead of {_meta.ArgumentPattern.Length}.");
+            _logger?.Log(Severity.Error, LogId.InvalidInstructionArgCount, $"Instruction '{name}' had {args.Length} arguments instead of {_meta.ArgumentPattern.Length}.");
+            return false;
         }
 
         // Assign op code and function code
@@ -107,50 +107,51 @@ public struct InstructionParser
         // Parse argument data according to pattern
         Argument[] pattern = _meta.ArgumentPattern;
         for (int i = 0; i < args.Length; i++)
-            ParseArg(args[i], pattern[i]);
+            TryParseArg(args[i], pattern[i]);
 
-        // Create an instruction from its components based on the instruction type
-        Instruction instruction = _meta.Type switch
+        // Create the instruction from its components based on the instruction type
+        instruction = _meta.Type switch
         {
             InstructionType.R => Instruction.Create(_funcCode, _rs, _rt, _rd, _shift),
             InstructionType.I => Instruction.Create(_opCode, _rs, _rt, _immediate),
             InstructionType.J => Instruction.Create(_opCode, _address),
-            _ => ThrowHelper.ThrowInvalidDataException<Instruction>(""),
+            _ => ThrowHelper.ThrowArgumentOutOfRangeException<Instruction>($"Invalid instruction type '{_meta.Type}'."),
         };
 
-        return instruction;
+        return true;
     }
 
-    private void ParseArg(string arg, Argument type)
+    private bool TryParseArg(string arg, Argument type)
     {
+        // Trim whitespace from argument
+        arg = arg.Trim();
+
         switch (type)
         {
             // Register type argument
             case Argument.RS:
             case Argument.RT:
             case Argument.RD:
-                ParseRegisterArg(arg, type);
-                break;
+                return TryParseRegisterArg(arg, type);
             // Immediate type argument
             case Argument.Shift:
             case Argument.Immediate:
             case Argument.Address:
-                ParseExpressionArg(arg, type);
-                break;
+                return TryParseExpressionArg(arg, type);
             // Address offset type argument
             case Argument.AddressOffset:
-                ParseAddressOffsetArg(arg);
-                break;
+                return TryParseAddressOffsetArg(arg);
+
+            // Invalid type
             default:
-                ThrowHelper.ThrowArgumentOutOfRangeException($"Argument type '{type}' is not in range.");
-                break;
+                return ThrowHelper.ThrowArgumentOutOfRangeException<bool>($"Argument '{arg}' of type '{type}' is not within parsable type range.");
         }
     }
 
     /// <summary>
     /// Parses an argument as a register and assigns it to the target component.
     /// </summary>
-    private void ParseRegisterArg(string arg, Argument target)
+    private bool TryParseRegisterArg(string arg, Argument target)
     {
         // Get reference to selected register argument
         ref Register reg = ref _rs;
@@ -166,104 +167,129 @@ public struct InstructionParser
                 reg = ref _rd;
                 break;
 
+            // Invalid target type
             default:
-                ThrowHelper.ThrowArgumentException($"Argument '{arg}' of type '{target}' attempted to parse as an expression.");
-                break;
+                return ThrowHelper.ThrowArgumentOutOfRangeException<bool>($"Argument '{arg}' of type '{target}' attempted to parse as a register.");
         }
 
         if (!TryParseRegister(arg, out var register))
         {
-            // TODO: Log error
-            // NOTE: This condition is currently not hit because any branch of
-            // TryParseRegister that would return false also throws an exception.
-            // When error messages are added the exceptions will be removed.
+            // Register could not be parsed.
+            // Error already logged.
+
+            return false;
         }
 
         // Cache register as appropriate argument type
         reg = register;
+
+        return true;
     }
 
     /// <summary>
     /// Parses an argument as an expression and assigns it to the target component
     /// </summary>
-    private void ParseExpressionArg(string arg, Argument target)
+    private bool TryParseExpressionArg(string arg, Argument target)
     {
+        // Attempt to parse expression
         if (!_expParser.TryParse(arg, out var value))
-        {
-            // TODO: Log error and remove exception
-
-            ThrowHelper.ThrowArgumentException($"Argument '{arg}' of type '{target}' was not a valid expression.");
-        }
+            return false;
 
         // NOTE: Casting might truncate the value to fit the bit size.
         // This is the desired behavior, but when logging errors this
         // should be handled explicitly and drop an assembler warning.
         
+        // Determine the bits allowed by the 
+        int bitCount = target switch
+        {
+            Argument.Shift => 5,
+            Argument.Immediate => 16,
+            Argument.Address => 26,
+            _ => ThrowHelper.ThrowArgumentOutOfRangeException<int>($"Argument '{arg}' of type '{target}' attempted to parse as an expression."),
+        };
+
+        // Shift and Address are unsigned. Immediate is the only signed argument
+        bool signed = target is Argument.Immediate;
+
+        // Clean integer to fit within argument bit size and match signs.
+        switch (CleanInteger(ref value, bitCount, signed, out var original))
+        {
+            case 0:
+                // Integer was already clean
+                break;
+
+            case 1:
+                // Integer was negative, but needs to be unsigned.
+                // Also may have been truncated.
+                _logger?.Log(Severity.Warning, LogId.IntegerTruncated, $"Expression '{arg}' evaluated to signed value {original}," +
+                                                                       $" but was cast to unsigned value and truncated to {bitCount}-bits, resulting in {value}.");
+                break;
+            case 2:
+                // Integer was truncated.
+                _logger?.Log(Severity.Warning, LogId.IntegerTruncated, $"Expression '{arg}' evaluated to {original}," +
+                                                                       $" but was truncated to {bitCount}-bits, resulting in {value}.");
+                break;
+        }
+
         // Assign to appropriate instruction argument
         switch (target)
         {
             case Argument.Shift:
                 _shift = (byte)value;
-                break;
+                return true;
             case Argument.Immediate:
                 _immediate = (short)value;
-                break;
+                return true;
             case Argument.Address:
                 _address = (uint)value;
-                break;
+                return true;
+                
+            // Invalid target type
             default:
-                ThrowHelper.ThrowArgumentOutOfRangeException($"Argument '{arg}' of type '{target}' attempted to parse as an expression.");
-                break;
+                return ThrowHelper.ThrowArgumentOutOfRangeException<bool>($"Argument '{arg}' of type '{target}' attempted to parse as an expression.");
         }
     }
 
     /// <summary>
     /// Parses an argument as an address offset, assigning its components to immediate and $rs.
     /// </summary>
-    private void ParseAddressOffsetArg(string arg)
+    private bool TryParseAddressOffsetArg(string arg)
     {
-        // Split the string into an offset and a register 
+        // NOTE: Be careful about forwards to other parse functions with regards to 
+        // error logging. Address offset argument errors might be inappropriately logged.
+
+
+        // Split the string into an offset and a register, return false if failed
         if (!TokenizeAddressOffset(arg, out var offsetStr, out var regStr))
-        {
-            // NOTE: This condition is currently not hit because any branch of
-            // TokenizeAddressOffset that would return false also throws an exception.
-            // When error messages are added the exceptions will be removed.
-            return;
-        }
+            return false;
         
-        // NOTE: Be careful about forwards to other parse functions when implementing 
-        // error logging. $rs and immediate errors might be inappropriately logged for
-        // address offset arguments.
+        // Try parse offset component into immediate, return false if failed
+        if (!TryParseExpressionArg(offsetStr, Argument.Immediate))
+            return false;
 
+        // Parse register component into $rs, return false if failed
+        if(!TryParseRegisterArg(regStr, Argument.RS))
+            return false;
 
-        // Parse offset component into immediate
-        ParseExpressionArg(offsetStr, Argument.Immediate);
-
-        // Parse register component into $rs
-        ParseRegisterArg(regStr, Argument.RS);
+        return true;
     }
 
-    private static bool TryParseRegister(string name, out Register register)
+    private bool TryParseRegister(string arg, out Register register)
     {
-        // Trim whitespace from register string
-        name = name.Trim();
+        register = Register.Zero;
 
         // Check that argument is register argument
-        if (name[0] != '$')
+        if (arg[0] != '$')
         {
-            // TODO: Log error and remove exception.
-
-            ThrowHelper.ThrowArgumentException($"Expected register argument. Found '{name}'");
-            register = Register.Zero;
+            _logger?.Log(Severity.Error, LogId.InvalidRegisterArgument, $"Expected register argument. Found '{arg}'");
             return false;
         }
 
         // Get register from table
-        if (!ConstantTables.TryGetRegister(name[1..], out register))
+        if (!ConstantTables.TryGetRegister(arg[1..], out register))
         {
-            // TODO: Log error and remove exception.
-
-            ThrowHelper.ThrowInvalidDataException($"{name} is not a valid register.");
+            // Register does not exist in table
+            _logger?.Log(Severity.Error, LogId.InvalidRegisterArgument, $"{arg} is not a valid register.");
             return false;
         }
 
@@ -275,11 +301,8 @@ public struct InstructionParser
     /// The register is just the component in parenthesis. The offset is just the component before the parenthesis.
     /// Nothing may follow the parenthesis.
     /// </remarks>
-    private static bool TokenizeAddressOffset(string arg, out string offset, out string register)
+    private bool TokenizeAddressOffset(string arg, out string offset, out string register)
     {
-        // Trim whitespace 
-        arg = arg.Trim();
-
         offset = string.Empty;
         register = string.Empty;
 
@@ -288,12 +311,12 @@ public struct InstructionParser
         int regStart = arg.IndexOf('(');
         int regEnd = arg.IndexOf(')');
 
-        // Either end of the parenthesis were not found
+        // Parenthesis pair was not found
         // Or contains both an opening and closing parenthesis, but they are not matched.
-        // Or there was content following the register
+        // Or there was content following the parenthesis 
         if (regStart == -1 || regEnd == -1 || regStart > regEnd || regEnd != arg.Length - 1)
         {
-            ThrowHelper.ThrowArgumentException($"Argument '{arg}' is not a valid address offset.");
+            _logger?.Log(Severity.Error, LogId.InvalidAddressOffsetArgument, $"Argument '{arg}' is not a valid address offset.");
             return false;
         }
 
@@ -303,6 +326,34 @@ public struct InstructionParser
         register = arg[(regStart + 1)..regEnd];
 
         return true;
+    }
+    
+    /// <returns>
+    /// 0 if unchanged, 1 if signChanged (maybe also have been truncated), and 2 if truncated.
+    /// </returns>
+    private static int CleanInteger(ref long integer, int bitCount, bool signed, out long original)
+    {
+        original = integer;
+
+        // Truncate integer to bit count
+        long mask = (1 << bitCount) - 1;
+        integer &= mask;
+
+        // Check for sign change
+        if (!signed && original < 0)
+        {
+            // Remove sign from truncated integer
+            // NOTE: This assumes bitCount is less than 32
+
+            integer = (uint)integer;
+            return 1;
+        }
+
+        // Check if truncated
+        if (integer != original)
+            return 2;
+
+        return 0;
     }
 }
 
