@@ -4,7 +4,7 @@ This repo contains excerpts of code from my projects that I am especially proud 
 
 ### Sample 1: [MIPS InstructionParser](https://github.com/Avid29/WorkSample/blob/master/MIPS/InstructionParser.cs)
 
-This is an excerpt from my [MIPS.Interpreter](https://github.com/Avid29/MIPS.Interpreter) project. It parses strings into binary instructions.
+This is an excerpt from my [MIPS.Interpreter](https://github.com/Avid29/MIPS.Interpreter) project. It parses MIPS assembly strings into binary encoded instructions.
 
 ### Sample 2: [MarqueeText control](https://github.com/Avid29/WorkSample/blob/master/MarqueeText/MarqueeText.cs)
 
