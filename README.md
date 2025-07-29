@@ -1,4 +1,4 @@
-# Adam Dernis WorkSample
+# Avishai Dernis WorkSample
 
 This repo contains excerpts of code from my projects that I am especially proud of and I believe demonstrate my ability to write reliable, readable, and efficient code.
 
