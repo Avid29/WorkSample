@@ -4,7 +4,7 @@ This repo contains excerpts of code from my projects that I am especially proud 
 
 ### Sample 1: [MIPS InstructionParser](https://github.com/Avid29/WorkSample/blob/master/MIPS/InstructionParser.cs)
 
-This is an excerpt from my [MIPSer](https://github.com/Avid29/MIPSer) project. It parses MIPS assembly strings into binary encoded instructions.
+This is an excerpt from my [MIPSer](https://github.com/Avid29/MIPSer) project. It parses tokenized lines of MIPS assembly into binary encoded instructions.
 
 ### Sample 2: [x86 Virtual Memory Managment](https://github.com/Avid29/WorkSample/blob/master/JOS/pmap.c)
 
