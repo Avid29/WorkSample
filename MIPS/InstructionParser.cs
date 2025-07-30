@@ -11,7 +11,7 @@
 // parse the instruction arguments according to the metadata argument pattern.
 // Immediate values are parsed with help from the ExpressionParser, which is
 // not included in this excerpt.
-
+//
 //      Finally all the parsed components are combined
 // with the, remaining encoding metadata to create an Instruction or
 // PseudoInstruction struct, which is then wrapped in a ParsedInstruction
