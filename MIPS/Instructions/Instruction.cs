@@ -11,7 +11,8 @@
 //
 // ----------------------------------------------------------------------------
 // 
-// This is an excerpt from my MIPSer project on GitHub.
+// This is an excerpt from my MIPSer project on GitHub. It is not the complete file, and it
+// may not be update to date.
 //
 // The full project can be found here:
 // https://github.com/Avid29/MIPSer
@@ -19,8 +20,8 @@
 // A link to the active file is available here:
 // https://github.com/Avid29/MIPSer/blob/main/src/MIPS/Models/Instructions/Instruction.cs
 //
-// And a permalink to when this excerpt was taken is available here:
-// https://github.com/Avid29/MIPSer/blob/f91e8127fa3ba8f94a077135dc3066723302ec53/src/MIPS/Models/Instructions/Instruction.cs
+// A permalink to the full file from when this excerpt was taken is available here:
+// https://github.com/Avid29/MIPSer/blob/360aa97bb812ac73802e19861354b714af9678d9/src/MIPS/Models/Instructions/Instruction.cs
 //
 
 //                               MIPS Primary Instructions Layout
@@ -210,7 +211,6 @@
 /// <summary>
 /// A struct representing an instruction.
 /// </summary>
-[DebuggerDisplay("{Disassembled}")]
 public struct Instruction
 {
     // Universal
@@ -240,129 +240,6 @@ public struct Instruction
     private uint _inst;
 
     /// <summary>
-    /// Creates a new <see cref="InstructionType.BasicR"/> instruction.
-    /// </summary>
-    public static Instruction Create(FunctionCode funcCode, Register rs, Register rt, Register rd, byte shiftAmount = 0)
-    {
-        Instruction value = default;
-        value.OpCode = OperationCode.Special;
-        value.RS = rs;
-        value.RT = rt;
-        value.RD = rd;
-        value.ShiftAmount = shiftAmount;
-        value.FuncCode = funcCode;
-        return value;
-    }
-    
-    /// <summary>
-    /// Creates a new <see cref="InstructionType.Special2R"/> instruction.
-    /// </summary>
-    public static Instruction Create(Func2Code func2Code, Register rs, Register rt, Register rd, byte shiftAmount = 0)
-    {
-        Instruction value = default;
-        value.OpCode = OperationCode.Special2;
-        value.RS = rs;
-        value.RT = rt;
-        value.RD = rd;
-        value.ShiftAmount = shiftAmount;
-        value.Func2Code = func2Code;
-        return value;
-    }
-    
-    /// <summary>
-    /// Creates a new <see cref="InstructionType.Special3R"/> instruction.
-    /// </summary>
-    public static Instruction Create(Func3Code func3Code, Register rs, Register rt, Register rd, byte shiftAmount = 0)
-    {
-        Instruction value = default;
-        value.OpCode = OperationCode.Special3;
-        value.RS = rs;
-        value.RT = rt;
-        value.RD = rd;
-        value.ShiftAmount = shiftAmount;
-        value.Func3Code = func3Code;
-        return value;
-    }
-
-    /// <summary>
-    /// Creates a new <see cref="InstructionType.BasicI"/> instruction.
-    /// </summary>
-    public static Instruction Create(OperationCode opCode, Register rs, Register rt, short immediate)
-    {
-        Instruction value = default;
-        value.OpCode = opCode;
-        value.RS = rs;
-        value.RT = rt;
-        value.ImmediateValue = immediate;
-        return value;
-    }
-
-    /// <summary>
-    /// Creates a new <see cref="InstructionType.BasicI"/> instruction.
-    /// </summary>
-    public static Instruction Create(OperationCode opCode, Register rs, Register rt, int offset)
-    {
-        Instruction value = default;
-        value.OpCode = opCode;
-        value.RS = rs;
-        value.RT = rt;
-        value.Offset = offset;
-        return value;
-    }
-
-    /// <summary>
-    /// Creates a new <see cref="InstructionType.BasicI"/> instruction.
-    /// </summary>
-    /// <remarks>
-    /// This is just for load upper immediate.
-    /// </remarks>
-    public static Instruction Create(OperationCode opCode, Register rt, short immediate)
-    {
-        Instruction value = default;
-        value.OpCode = opCode;
-        value.RT = rt;
-        value.ImmediateValue = immediate;
-        return value;
-    }
-
-    /// <summary>
-    /// Creates a new <see cref="InstructionType.BasicJ"/> instruction.
-    /// </summary>
-    public static Instruction Create(OperationCode opCode, uint address)
-    {
-        Instruction value = default;
-        value.OpCode = opCode;
-        value.Address = address;
-        return value;
-    }
-    
-    /// <summary>
-    /// Creates a new <see cref="InstructionType.RegisterImmediate"/> instruction.
-    /// </summary>
-    public static Instruction Create(RegImmFuncCode code, Register rs, short immediate)
-    {
-        Instruction value = default;
-        value.OpCode = OperationCode.RegisterImmediate;
-        value.RTFuncCode = code;
-        value.RS = rs;
-        value.ImmediateValue = immediate;
-        return value;
-    }
-
-    /// <summary>
-    /// Creates a new <see cref="InstructionType.RegisterImmediateBranch"/> branch instruction.
-    /// </summary>
-    public static Instruction Create(RegImmFuncCode code, Register rs, int offset)
-    {
-        Instruction value = default;
-        value.OpCode = OperationCode.RegisterImmediate;
-        value.RTFuncCode = code;
-        value.RS = rs;
-        value.Offset = offset;
-        return value;
-    }
-
-    /// <summary>
     /// Gets a no operation instruction.
     /// </summary>
     public static Instruction NOP => (Instruction)0;
@@ -384,18 +261,18 @@ public struct Instruction
     /// <summary>
     /// Gets the instruction's RS Register 
     /// </summary>
-    public Register RS
+    public GPRegister RS
     { 
-        readonly get => (Register)UintMasking.GetShiftMask(_inst, REGISTER_BIT_SIZE, RS_BIT_OFFSET);
+        readonly get => (GPRegister)UintMasking.GetShiftMask(_inst, REGISTER_BIT_SIZE, RS_BIT_OFFSET);
         internal set => UintMasking.SetShiftMask(ref _inst, REGISTER_BIT_SIZE, RS_BIT_OFFSET, (uint)value);
     }
     
     /// <summary>
     /// Gets the instruction's RT Register 
     /// </summary>
-    public Register RT
+    public GPRegister RT
     { 
-        readonly get => (Register)UintMasking.GetShiftMask(_inst, REGISTER_BIT_SIZE, RT_BIT_OFFSET);
+        readonly get => (GPRegister)UintMasking.GetShiftMask(_inst, REGISTER_BIT_SIZE, RT_BIT_OFFSET);
         internal set => UintMasking.SetShiftMask(ref _inst, REGISTER_BIT_SIZE, RT_BIT_OFFSET, (uint)value);
     }
 
@@ -409,15 +286,15 @@ public struct Instruction
     public RegImmFuncCode RTFuncCode
     {
         readonly get => (RegImmFuncCode)RT;
-        internal set => RT = (Register)value;
+        internal set => RT = (GPRegister)value;
     }
 
     /// <summary>
     /// Gets the instruction's RD Register 
     /// </summary>
-    public Register RD
+    public GPRegister RD
     { 
-        readonly get => (Register)UintMasking.GetShiftMask(_inst, REGISTER_BIT_SIZE, RD_BIT_OFFSET);
+        readonly get => (GPRegister)UintMasking.GetShiftMask(_inst, REGISTER_BIT_SIZE, RD_BIT_OFFSET);
         internal set => UintMasking.SetShiftMask(ref _inst, REGISTER_BIT_SIZE, RD_BIT_OFFSET, (uint)value);
     }
 
@@ -492,15 +369,6 @@ public struct Instruction
         readonly get => UintMasking.GetShiftMask(_inst, ADDRESS_BIT_SIZE, ADDRESS_BIT_OFFSET) << 2;
         internal set => UintMasking.SetShiftMask(ref _inst, ADDRESS_BIT_SIZE, ADDRESS_BIT_OFFSET, value >> 2);
     }
-    
-    #if DEBUG
-
-    /// <summary>
-    /// Gets the instruction disassembled as assembly code.
-    /// </summary>
-    public readonly string Disassembled => ServiceCollection.DisassemblerService?.Disassemble(this) ?? "No disassembler provided";
-
-    #endif
 
     /// <summary>
     /// Casts a <see cref="uint"/> to a <see cref="Instruction"/>.

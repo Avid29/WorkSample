@@ -11,7 +11,8 @@
 //
 // ----------------------------------------------------------------------------
 // 
-// This is an excerpt from my MIPSer project on GitHub.
+// This is an excerpt from my MIPSer project on GitHub. It is not the complete file, and it
+// may not be update to date
 //
 // The full project can be found here:
 // https://github.com/Avid29/MIPSer
@@ -19,7 +20,7 @@
 // A link to the active file is available here:
 // https://github.com/Avid29/MIPSer/blob/main/src/MIPS/Models/Instructions/FloatInstruction.cs
 //
-// And a permalink to when this excerpt was taken is available here:
+// A permalink to the full file from when this excerpt was taken is available here:
 // https://github.com/Avid29/MIPSer/blob/f91e8127fa3ba8f94a077135dc3066723302ec53/src/MIPS/Models/Instructions/FloatInstruction.cs
 //
 
@@ -94,38 +95,10 @@ public struct FloatInstruction
     private Instruction _inst;
     
     /// <summary>
-    /// Creates a new floating-point coprocessor instruction.
-    /// </summary>
-    public static FloatInstruction Create(FloatFuncCode funcCode, FloatFormat format, FloatRegister fs, FloatRegister fd, FloatRegister ft = FloatRegister.F0)
-    {
-        FloatInstruction value = default;
-        value.OpCode = OperationCode.Coprocessor1;
-        value.FloatFuncCode = funcCode;
-        value.Format = format;
-        value.FS = fs;
-        value.FD = fd;
-        value.FT = ft;
-        return value;
-    }
-    
-    /// <summary>
-    /// Creates a new floating-point coprocessor instruction.
-    /// </summary>
-    public static FloatInstruction Create(CoProc1RSCode code, Register rt, FloatRegister fs)
-    {
-        FloatInstruction value = default;
-        value.OpCode = OperationCode.Coprocessor1;
-        value.CoProc1RSCode = code;
-        value.RT = rt;
-        value.FS = fs;
-        return value;
-    }
-
-    /// <summary>
     /// Gets the instruction's operation code.
     /// </summary>
     public OperationCode OpCode
-    { 
+    {
         readonly get => _inst.OpCode;
         private set => _inst.OpCode = value;
     }
@@ -145,7 +118,7 @@ public struct FloatInstruction
     public CoProc1RSCode CoProc1RSCode
     {
         readonly get => (CoProc1RSCode)_inst.RS;
-        private set => _inst.RS = (Register)value;
+        private set => _inst.RS = (GPRegister)value;
     }
 
     /// <summary>
@@ -154,7 +127,7 @@ public struct FloatInstruction
     public FloatFormat Format
     {
         readonly get => (FloatFormat)_inst.RS;
-        private set => _inst.RS = (Register)value;
+        private set => _inst.RS = (GPRegister)value;
     }
 
     /// <summary>
@@ -163,13 +136,13 @@ public struct FloatInstruction
     public FloatRegister FT
     {
         readonly get => (FloatRegister)_inst.RT;
-        private set => _inst.RT = (Register)value;
+        private set => _inst.RT = (GPRegister)value;
     }
 
     /// <summary>
     /// Gets the instruction's RT Register.
     /// </summary>
-    public Register RT
+    public GPRegister RT
     {
         readonly get => _inst.RT;
         private set => _inst.RT = value;
@@ -181,7 +154,7 @@ public struct FloatInstruction
     public FloatRegister FS
     {
         readonly get => (FloatRegister)_inst.RD;
-        private set => _inst.RD = (Register)value;
+        private set => _inst.RD = (GPRegister)value;
     }
 
     /// <summary>

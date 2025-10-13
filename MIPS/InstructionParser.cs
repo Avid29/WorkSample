@@ -1,5 +1,4 @@
 // Avishai Dernis 2025
-
 //
 //                                    Excerpt Summary
 // ----------------------------------------------------------------------------
@@ -25,7 +24,8 @@
 //
 // ----------------------------------------------------------------------------
 // 
-// This is an excerpt from my MIPSer project on GitHub.
+// This is an excerpt from my MIPSer project on GitHub. It is not the complete file
+// (some functions have been removed for brevity), and it may not be update to date.
 //
 // The full project can be found here:
 // https://github.com/Avid29/MIPSer
@@ -33,8 +33,8 @@
 // A link to the active file is available here:
 // https://github.com/Avid29/MIPSer/blob/main/src/MIPS.Assembler/Parsers/InstructionParser.cs
 //
-// And a permalink to when this excerpt was taken is available here:
-// https://github.com/Avid29/MIPSer/blob/f91e8127fa3ba8f94a077135dc3066723302ec53/src/MIPS.Assembler/Parsers/InstructionParser.cs
+// A permalink to the full file from when this excerpt was taken is available here:
+// https://github.com/Avid29/MIPSer/blob/main/src/MIPS.Assembler/Parsers/InstructionParser.cs
 // 
 
 /// <summary>
@@ -48,40 +48,13 @@ public struct InstructionParser
 
     private InstructionMetadata _meta;
 
-    private Register _rs;
-    private Register _rt;
-    private Register _rd;
+    private GPRegister _rs;
+    private GPRegister _rt;
+    private GPRegister _rd;
+    private FloatFormat _format;
     private byte _shift;
     private int _immediate;
     private uint _address;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="InstructionParser"/> struct.
-    /// </summary>
-    public InstructionParser(InstructionTable instructions, ILogger? logger) : this(context:null, logger)
-    {
-        _instructionTable = instructions;
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="InstructionParser"/> struct.
-    /// </summary>
-    public InstructionParser(AssemblerContext? context, ILogger? logger)
-    {
-        _context = context;
-
-        // This contains a null suppresion so the instructionTable can
-        // be set by the calling constructor. It's not great design.
-        _instructionTable = context?.InstructionTable ?? null!; 
-        _logger = logger;
-        _meta = default;
-        _rs = default;
-        _rt = default;
-        _rd = default;
-        _shift = default;
-        _immediate = default;
-        _address = default;
-    }
 
     /// <summary>
     /// Attempts to parse an instruction from a name and a list of arguments.
@@ -94,45 +67,18 @@ public struct InstructionParser
         ReferenceEntry? reference = null;
         parsedInstruction = null;
 
-        var name = line.Instruction;
-        Guard.IsNotNull(name);
-
-        // Get instruction metadata from name
-        if (!_instructionTable.TryGetInstruction(name.Source, out _meta, out var version))
-        {
-            if (version is not null)
-            {
-                // The instruction exists, but is not supported with the active MIPS version.
-                if (_context is null || version > _context?.Config.MipsVersion)
-                {
-                    _logger?.Log(Severity.Error, LogId.NotInVersion, $"The instruction '{name}' requires mips version {version:d}.");
-                } else
-                {
-                    _logger?.Log(Severity.Error, LogId.NotInVersion, $"The instruction '{name}' is deprecated. Last supported in mips version {version:d}.");
-                }
-            }
-            else
-            {
-                // The instruction does not exist in the table.
-                _logger?.Log(Severity.Error, LogId.InvalidInstructionName, $"No instruction named '{name}'.");
-            }
+        // Attempt to load the instruction
+        // If successful, this will set the _meta and _format
+        if (!TryParseInstruction(line, out var name))
             return false;
-        }
+
+        // Applies provided values
+        _rs = (GPRegister)(_meta.RS ?? default);
+        _rt = (GPRegister)(_meta.RT ?? default);
+        _rd = (GPRegister)(_meta.RD ?? default);
 
         // Parse argument data according to pattern
         Argument[] pattern = _meta.ArgumentPattern;
-        
-        // Assert proper argument count for instruction
-        if (line.Args.Count != pattern.Length)
-        {
-            var message = line.Args.Count < pattern.Length
-                ? $"Instruction '{name}' doesn't have enough arguments. Found {line.Args.Count} arguments when expecting {_meta.ArgumentPattern.Length}."
-                : $"Instruction '{name}' has too many arguments! Found {line.Args.Count} arguments when expecting {_meta.ArgumentPattern.Length}.";
-
-            _logger?.Log(Severity.Error, LogId.InvalidInstructionArgCount, message);
-            return false;
-        }
-
         for (int i = 0; i < line.Args.Count; i++)
         {
             // Split out next arg
@@ -140,12 +86,14 @@ public struct InstructionParser
             TryParseArg(arg, pattern[i], out reference);
         }
 
-        // Handle the pseudo-instruction condition
+        // It's a psuedo instruction.
+        // Create a pseudo-instruction and return with reference
+        // as parsed instruction.
         if (_meta.IsPseudoInstruction)
         {
             Guard.IsTrue(_meta.PseudoOp.HasValue);
 
-            var pseudo = new PseudoInstruction()
+            var pseudo = new PseudoInstruction
             {
                 PseudoOp = _meta.PseudoOp.Value,
                 RS = _rs,
@@ -159,76 +107,75 @@ public struct InstructionParser
             return true;
         }
 
-        // If it's not a pseudo instruction, there should be an OpCode
-        Guard.IsNotNull(_meta.OpCode);
-
-        // Create the instruction from its components based on the instruction type
-        Instruction instruction = _meta.OpCode switch
-        {
-            // R Type
-            OperationCode.Special => _meta.FuncCode.HasValue ?                              // Special
-                Instruction.Create(_meta.FuncCode.Value, _rs, _rt, _rd, _shift) :
-                _ = ThrowHelper.ThrowArgumentException<Instruction>($"Instructions with OpCode:{_meta.OpCode} must have a {nameof(_meta.FuncCode)} value."),
-            OperationCode.Special2 => _meta.Function2Code.HasValue ?                        // Special 2
-                Instruction.Create(_meta.Function2Code.Value, _rs, _rt, _rd, _shift) :
-                _ = ThrowHelper.ThrowArgumentException<Instruction>($"Instructions with OpCode:{_meta.OpCode} must have a {nameof(_meta.Function2Code)} value."),
-            OperationCode.Special3 => _meta.Function3Code.HasValue ?                        // Special 3
-                Instruction.Create(_meta.Function3Code.Value, _rs, _rt, _rd, _shift) :
-                _ = ThrowHelper.ThrowArgumentException<Instruction>($"Instructions with OpCode:{_meta.OpCode} must have a {nameof(_meta.Function3Code)} value."),
-            
-            // J Type
-            OperationCode.Jump or
-            OperationCode.JumpAndLink => Instruction.Create(_meta.OpCode.Value, _address),
-
-            // Coprocessor0 instructions
-            OperationCode.Coprocessor0 when _meta.Co0FuncCode.HasValue                      // C0
-                => CoProc0Instruction.Create(_meta.Co0FuncCode.Value),
-            OperationCode.Coprocessor0 when _meta.Mfmc0FuncCode.HasValue                    // MFMC0
-                => CoProc0Instruction.Create(_meta.Mfmc0FuncCode.Value, _rt, _meta.RD),
-            OperationCode.Coprocessor0 => _meta.CoProc0RS.HasValue ?                        // Co0 RS
-                CoProc0Instruction.Create(_meta.CoProc0RS.Value, _rt, _rd) :
-                _ = ThrowHelper.ThrowArgumentException<Instruction>($"Instructions with OpCode:{_meta.OpCode} must have a {nameof(_meta.CoProc0RS)}, {nameof(_meta.Co0FuncCode)}, or {nameof(_meta.Mfmc0FuncCode)} value."),
-            
-            // FloatingPoint instructions
-            OperationCode.Coprocessor1 when _meta.FloatFuncCode.HasValue && _meta.FloatFormat.HasValue  // Floating-Point
-                => FloatInstruction.Create(_meta.FloatFuncCode.Value, _meta.FloatFormat.Value, (FloatRegister)_rs, (FloatRegister)_rd, (FloatRegister)_rt),
-            OperationCode.Coprocessor1 => _meta.CoProc1RS.HasValue ?                                    // CoProc1
-                FloatInstruction.Create(_meta.CoProc1RS.Value, _rt, (FloatRegister)_rs) :
-                _ = ThrowHelper.ThrowArgumentException<Instruction>($"Instruction with OpCode:{_meta.OpCode} must have a {nameof(_meta.CoProc1RS)} value or {nameof(_meta.FloatFuncCode)} and {nameof(_meta.FloatFormat)} values."),
-
-            // Register Immediate
-            OperationCode.RegisterImmediate => _meta.RegisterImmediateFuncCode switch
-            {
-                // Register Immediate Branching
-                (>= RegImmFuncCode.BranchOnLessThanZero and <= RegImmFuncCode.BranchOnGreaterThanZeroLikely) or
-                (>= RegImmFuncCode.BranchOnLessThanZeroAndLink and <= RegImmFuncCode.BranchOnGreaterThanOrEqualToZeroLikelyAndLink)
-                    => Instruction.Create(_meta.RegisterImmediateFuncCode.Value, _rs, _immediate),
-
-                // Throw exception if null
-                null => ThrowHelper.ThrowArgumentException<Instruction>($"Instruction with OpCode:{_meta.OpCode} must have a {nameof(_meta.RegisterImmediateFuncCode)} value."),
-
-                // Register Immediate
-                _ => Instruction.Create(_meta.RegisterImmediateFuncCode.Value, _rs, (short)_immediate)
-            },
-            
-            // I-Type Branch
-            (>= OperationCode.BranchOnEquals and <= OperationCode.BranchGreaterThanZero) or
-            (>= OperationCode.BranchOnEqualLikely and <= OperationCode.BranchOnGreaterThanZeroLikely)
-                    => Instruction.Create(_meta.OpCode.Value, _rs, _rt, _immediate),
-
-            // Remaining I Type instructions
-            _ => Instruction.Create(_meta.OpCode.Value, _rs, _rt, (short)_immediate),
-        };
+        // Build an instruction using the information from
+        // _meta and all the parsed arguments
+        var instruction = BuildInstruction();
 
         // Check for write back to zero register
         // Give a warning if not an explicit nop operation
         // TODO: Check on pseudo-instructions
-        if (instruction.GetWritebackRegister() is Register.Zero && name.Source != "nop")
+        if (instruction.GetWritebackRegister() is GPRegister.Zero && name != "nop")
         {
             _logger?.Log(Severity.Message, LogId.ZeroRegWriteBack, "This instruction writes to $zero.");
         }
 
         parsedInstruction = new ParsedInstruction(instruction, reference);
+        return true;
+    }
+
+    private bool TryParseInstruction(AssemblyLine line, [NotNullWhen(true)] out string? name)
+    {
+        name = line.Instruction?.Source;
+        Guard.IsNotNull(name);
+
+        // Parse out format from instruction name if present
+        if (FloatFormatTable.TryGetFloatFormat(name, out _format, out var formattedName))
+            name = formattedName;
+
+        if (!_instructionTable.TryGetInstruction(name, out var metas, out var version))
+        {
+            // Select error message
+            (LogId id, string message) = version switch
+            {
+                // The instruction requires a higher MIPS version
+                not null when _context is null || version > _context?.Config.MipsVersion =>
+                    (LogId.NotInVersion, $"The instruction '{name}' requires mips version {version:d}."),
+
+                // The instruction is deprecated
+                not null => (LogId.NotInVersion, $"The instruction '{name}' is deprecated. Last supported in mips version {version:d}."),
+
+                // The instruction does not exist.
+                null => (LogId.InvalidInstructionName, $"No instruction named '{name}'.")
+            };
+
+            // Log the error
+            _logger?.Log(Severity.Error, id, message);
+            return false;
+        }
+
+        // Assert instruction metadata with proper argument count exists
+        if (!metas.Any(x => x.ArgumentPattern.Length == line.Args.Count))
+        {
+            // TODO: Improve messaging
+            var message = $"Instruction '{name}' does not have the appropriate number of arguments.";
+            //var message = line.Args.Count < pattern.Length
+            //    ? $"Instruction '{name}' doesn't have enough arguments. Found {line.Args.Count} arguments when expecting {_meta.ArgumentPattern.Length}."
+            //    : $"Instruction '{name}' has too many arguments! Found {line.Args.Count} arguments when expecting {_meta.ArgumentPattern.Length}.";
+
+            _logger?.Log(Severity.Error, LogId.InvalidInstructionArgCount, message);
+            return false;
+        }
+
+        // Find instruction pattern with matching argument count
+        _meta = metas.FirstOrDefault(x => x.ArgumentPattern.Length == line.Args.Count);
+
+        // Check that the float format is supported valid with the instruction, if applicable
+        if (_meta.FloatFormats is not null && !_meta.FloatFormats.Contains(_format))
+        {
+            _logger?.Log(Severity.Error, LogId.InvalidFloatFormat, $"Instruction '{name}' does not support float format '{_format}'.");
+            return false;
+        }
+
         return true;
     }
 
@@ -239,11 +186,18 @@ public struct InstructionParser
         return type switch
         {
             // Register arguments
-            (>= Argument.RS and <= Argument.RD) or (>= Argument.FS and <= Argument.FD) or Argument.RT_Numbered => TryParseRegisterArg(arg[0], type),
+            (>= Argument.RS and <= Argument.RD) or
+            (>= Argument.FS and <= Argument.FD) or
+            Argument.RT_Numbered => TryParseRegisterArg(arg[0], type),
+
             // Expression arguments
-            Argument.Shift or Argument.Immediate or Argument.FullImmediate or Argument.Offset or Argument.Address => TryParseExpressionArg(arg, type, out reference),
+            Argument.Shift or Argument.Immediate or
+            Argument.FullImmediate or Argument.Offset
+            or Argument.Address => TryParseExpressionArg(arg, type, out reference),
+
             // Address offset arguments
             Argument.AddressBase => TryParseAddressOffsetArg(arg, out reference),
+
             _ => ThrowHelper.ThrowArgumentOutOfRangeException<bool>($"Argument of type '{type}' is not within parsable type range."),
         };
     }
@@ -254,11 +208,11 @@ public struct InstructionParser
     private unsafe bool TryParseRegisterArg(Token arg, Argument target)
     {
         // Get reference to selected register argument
-        ref Register reg = ref _rs;
+        ref GPRegister reg = ref _rs;
         RegisterSet set = RegisterSet.GeneralPurpose;
         switch (target)
         {
-            // GPU Registers
+            // General Purpose Registers
             case Argument.RS:
                 reg = ref _rs;
                 break;
@@ -325,17 +279,6 @@ public struct InstructionParser
         // This is the desired behavior, but when logging errors this
         // should be handled explicitly and drop an assembler warning.
 
-        // Determine the bits allowed by the 
-        int bitCount = target switch
-        {
-            Argument.Shift => 5,
-            Argument.Immediate => 16,
-            Argument.Offset => 18,  // Offset and address are only 16/26 bits in storage. However, the last
-            Argument.Address => 28, // two bits are dropped so the 18th and 28th bits must be cleaned too
-            Argument.FullImmediate => 32,
-            _ => ThrowHelper.ThrowArgumentOutOfRangeException<int>($"Argument of type '{target}' attempted to parse as an expression."),
-        };
-
         if (!address.IsFixed && target is Argument.Shift)
         {
             _logger?.Log(Severity.Error, LogId.RelocatableReferenceInShift, "Shift amount argument cannot reference relocatable symbols.");
@@ -367,39 +310,8 @@ public struct InstructionParser
 
         long value = address.Value;
 
-        // Shift and Address are unsigned. Immediate and offset are the only signed arguments
-        bool signed = target is Argument.Immediate or Argument.Offset;
-
-        // Clean integer to fit within argument bit size and match signs.
-        long original = 0;
-        var cleanStatus = target switch
-        {
-            Argument.Shift => CleanInteger(ref value, bitCount, signed, out original),
-            Argument.Immediate => CleanInteger<short>(ref value, out original),
-            Argument.Offset => CleanInteger(ref value, bitCount, signed, out original),
-            Argument.Address => CleanInteger(ref value, bitCount, signed, out original),
-            Argument.FullImmediate => CleanInteger<int>(ref value, out original),
-            _ => ThrowHelper.ThrowArgumentOutOfRangeException<int>($"Argument of type '{target}' attempted to parse as an expression."),
-        };
-
-        switch (cleanStatus)
-        {
-            case 0:
-                // Integer was already clean
-                break;
-
-            case 1:
-                // Integer was negative, but needs to be unsigned.
-                // Also may have been truncated.
-                _logger?.Log(Severity.Warning, LogId.IntegerTruncated, $"Expression '{arg.Print()}' evaluated to signed value {original}," +
-                                                                       $" but was cast to unsigned value and truncated to {bitCount}-bits, resulting in {value}.");
-                break;
-            case 2:
-                // Integer was truncated.
-                _logger?.Log(Severity.Warning, LogId.IntegerTruncated, $"Expression '{arg.Print()}' evaluated to {original}," +
-                                                  $" but was truncated to {bitCount}-bits, resulting in {value}.");
-                break;
-        }
+        // Truncates the value to fit the target argument
+        CleanInteger(ref value, arg, target);
 
         // Assign to appropriate instruction argument
         switch (target)
@@ -428,7 +340,7 @@ public struct InstructionParser
                         return false;
                     }
 
-                    // Adjust realtive to current position
+                    // Adjust relative to current position
                     value -= @base.Value;
                 }
 
@@ -466,9 +378,9 @@ public struct InstructionParser
         return true;
     }
 
-    private readonly bool TryParseRegister(Token arg, out Register register, RegisterSet set = RegisterSet.GeneralPurpose)
+    private readonly bool TryParseRegister(Token arg, out GPRegister register, RegisterSet set = RegisterSet.GeneralPurpose)
     {
-        register = Register.Zero;
+        register = GPRegister.Zero;
 
         // Check that argument is register argument
         var regStr = arg.Source;
@@ -479,7 +391,7 @@ public struct InstructionParser
         }
 
         // Get named register from table
-        if (!RegistersTable.TryGetRegister(regStr[1..], out register, out RegisterSet parsedSet))
+        if (!RegistersTable.TryGetRegister(regStr, out register, out RegisterSet parsedSet))
         {
             // Register does not exist in table
             _logger?.Log(Severity.Error, LogId.InvalidRegisterArgument, $"No register '{arg}' exists.");
@@ -522,7 +434,7 @@ public struct InstructionParser
 
         // Offset is everything before the parenthesis
         offset = arg[..parIndex];
-        arg = arg[(parIndex+1)..];
+        arg = arg[(parIndex + 1)..];
 
         // Register is everything between the parenthesis,
         // and must be a single token.
@@ -542,57 +454,106 @@ public struct InstructionParser
         return true;
     }
 
-    /// <returns>
-    /// 0 if unchanged, 1 if signChanged (maybe also have been truncated), and 2 if truncated.
-    /// </returns>
-    private static byte CleanInteger(ref long integer, int bitCount, bool signed, out long original)
-    {
-        // TODO: Support signed truncation
-        original = integer;
-
-        // Truncate integer to bit count
-        long mask = (1L << bitCount) - 1;
-        integer &= mask;
-
-        // Check for sign in unsigned integer
-        // TODO: Handle bitCount >= 32
-        if (!signed && original < 0 && bitCount < 32)
+    private void CleanInteger(ref long value, ReadOnlySpan<Token> arg, Argument target)
+    {   
+        // Determine casting details for the argument
+        (int bitCount, int shiftAmount, bool signed) = target switch
         {
-            // Remove sign from truncated integer
-            integer = (uint)integer;
-            return 1;
-        }
+            Argument.Shift => (5, 0, false),
+            Argument.Offset => (16, 2, false),
+            Argument.Immediate => (16, 0, true),
+            Argument.Address => (26, 2, false),
+            Argument.FullImmediate => (32, 0, true),
+            _ => ThrowHelper.ThrowArgumentOutOfRangeException<(byte, byte, bool)>($"Argument of type '{target}' attempted to parse as an expression."),
+        };
 
-        // Restore sign on signed integers
-        if (signed && original < 0)
+        // Clean integer to fit within argument bit size and match signs.
+        long original = value;
+        var cleanStatus = CastInteger(ref value, bitCount, shiftAmount, signed);
+
+        // Generate a message if any changes made to the value when casting.
+        var message = cleanStatus switch
         {
-            integer |= ~mask;
+            // Sign changed
+            CastingChanges.SignChanged =>
+            $"Expression '{arg.Print()}' evaluated to signed value {original}" +
+            $"but was cast to an unsigned value, resulting in {value}.",
+
+            // Truncated
+            CastingChanges.Truncated =>
+            $"Expression '{arg.Print()}' evaluated to {original}, but was truncated to " +
+            $"{bitCount}-bits dropping the lower {shiftAmount} bits, resulting in {value}.",
+
+            // Truncated and sign changed
+            CastingChanges.TruncatedAndSignChanged =>
+            $"Expression '{arg.Print()}' evaluated to {original}, but was truncated to an" +
+            $"unsigned value with {bitCount}-bits dropping the lower {shiftAmount} bits," +
+            $"resulting in {value}.",
+
+            // No changes
+            _ => null,
+        };
+
+        // If a message was generated, log it
+        if (message is not null)
+        {
+            _logger?.Log(Severity.Warning, LogId.IntegerTruncated, message);
         }
-
-        // Check if truncated lossily
-        if ((original & ~mask) != 0 && ~(original | mask) != 0)
-            return 2;
-
-        return 0;
     }
-    
-    /// <returns>
-    /// 0 if unchanged, 1 if signChanged (maybe also have been truncated), and 2 if truncated.
-    /// </returns>
-    private static byte CleanInteger<T>(ref long integer, out long original)
-        where T : unmanaged, IBinaryInteger<T>
+
+    /// <remarks>
+    /// This does not apply the <paramref name="shiftAmount"/>! It only masks the lower bits.
+    /// </remarks>
+    /// <param name="integer">A reference to the integer to modify.</param>
+    /// <param name="bitCount">The number of bits after casting.</param>
+    /// <param name="shiftAmount">The number of bits that will drop from the bottom.</param>
+    /// <param name="signed">Whether or not the new value should be signed.</param>
+    /// <returns>The changes made to the integer.</returns>
+    private static CastingChanges CastInteger(ref long integer, int bitCount, int shiftAmount, bool signed = false)
     {
-        original = integer;
+        var original = integer;
 
-        var cast = T.CreateTruncating(original);
-        integer = long.CreateSaturating(cast);
+        Guard.IsGreaterThan(bitCount, 1);
+        Guard.IsLessThanOrEqualTo(bitCount + shiftAmount, 64);
 
-        if (long.Sign(original) != T.Sign(cast))
-            return 1;
+        // Create a masks for the high and low truncating bits,
+        // as well as an overall remaining bits map.
+        var upperMask = bitCount == 64 ? -1L : (1L << (bitCount + shiftAmount)) - 1;
+        var lowerMask = ~((1L << shiftAmount) - 1);
+        var mask = (upperMask & lowerMask);
 
-        if (integer != original)
-            return 2;
+        // Truncate mask upper and lower bits
+        long truncated = integer & mask;
 
-        return 0;
+        // Sign extend if signed and not full width
+        if (signed && bitCount < 64)
+        {
+            long signBit = 1L << (bitCount - 1);
+            if ((truncated & signBit) != 0)
+                truncated |= ~upperMask; // Sign extend
+        }
+        
+        integer = truncated;
+
+        // Compute changes
+        var changes = CastingChanges.None;
+
+        // Check if the sign changed
+        if ((original < 0) != (truncated < 0))
+            changes |= CastingChanges.SignChanged;
+
+        // Check for upper truncation
+        long upperBits = integer & ~upperMask;
+        if (upperBits != 0 && upperBits != ~upperMask)
+            changes |= CastingChanges.Truncated;
+
+        // Check for lower truncation
+        if ((original & ~lowerMask) != 0)
+        {
+            changes |= CastingChanges.Truncated;
+        }
+
+        // Return combined code
+        return changes;
     }
 }
