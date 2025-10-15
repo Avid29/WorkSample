@@ -55,7 +55,7 @@ public struct InstructionParser
     private byte _shift;
     private int _immediate;
     private uint _address;
-
+    
     /// <summary>
     /// Attempts to parse an instruction from a name and a list of arguments.
     /// </summary>
@@ -208,46 +208,24 @@ public struct InstructionParser
     private unsafe bool TryParseRegisterArg(Token arg, Argument target)
     {
         // Get reference to selected register argument
-        ref GPRegister reg = ref _rs;
-        RegisterSet set = RegisterSet.GeneralPurpose;
-        switch (target)
+        RefTuple<Ref<GPRegister>, RegisterSet> pair = target switch
         {
             // General Purpose Registers
-            case Argument.RS:
-                reg = ref _rs;
-                break;
-            case Argument.RT:
-                reg = ref _rt;
-                break;
-            case Argument.RD:
-                reg = ref _rd;
-                break;
-
+            Argument.RS => new(new(ref _rs), RegisterSet.GeneralPurpose),
+            Argument.RT => new(new(ref _rt), RegisterSet.GeneralPurpose),
+            Argument.RD => new(new(ref _rd), RegisterSet.GeneralPurpose),
             // Float Registers
-            case Argument.FS:
-                reg = ref _rs;
-                set = RegisterSet.FloatingPoints;
-                break;
-            case Argument.FT:
-                reg = ref _rt;
-                set = RegisterSet.FloatingPoints;
-                break;
-            case Argument.FD:
-                reg = ref _rd;
-                set = RegisterSet.FloatingPoints;
-                break;
-
+            Argument.FS => new(new(ref _rs), RegisterSet.FloatingPoints),
+            Argument.FT => new(new(ref _rt), RegisterSet.FloatingPoints),
+            Argument.FD => new(new(ref _rd), RegisterSet.FloatingPoints),
             // RT Register for coprocessors
-            case Argument.RT_Numbered:
-                reg = ref _rt;
-                set = RegisterSet.Numbered;
-                break;
-
+            Argument.RT_Numbered => new(new(ref _rt), RegisterSet.Numbered),
             // Invalid target type
-            default:
-                // TODO: improve message
-                return ThrowHelper.ThrowArgumentOutOfRangeException<bool>($"Argument of type '{target}' attempted to parse as a register.");
-        }
+            _ => throw new ArgumentOutOfRangeException($"Argument of type '{target}' attempted to parse as a register.")
+        };
+
+        (Ref<GPRegister> regRef, RegisterSet set) = pair;
+        ref GPRegister reg = ref regRef.Value;
 
         if (!TryParseRegister(arg, out var register, set))
         {
@@ -340,7 +318,7 @@ public struct InstructionParser
                         return false;
                     }
 
-                    // Adjust relative to current position
+                    // Adjust realtive to current position
                     value -= @base.Value;
                 }
 
@@ -455,7 +433,7 @@ public struct InstructionParser
     }
 
     private void CleanInteger(ref long value, ReadOnlySpan<Token> arg, Argument target)
-    {   
+    {
         // Determine casting details for the argument
         (int bitCount, int shiftAmount, bool signed) = target switch
         {
@@ -487,7 +465,7 @@ public struct InstructionParser
             // Truncated and sign changed
             CastingChanges.TruncatedAndSignChanged =>
             $"Expression '{arg.Print()}' evaluated to {original}, but was truncated to an" +
-            $"unsigned value with {bitCount}-bits dropping the lower {shiftAmount} bits," +
+            $"unsigned value with {bitCount}-bits and dropping the lower {shiftAmount} bits," +
             $"resulting in {value}.",
 
             // No changes
@@ -532,7 +510,7 @@ public struct InstructionParser
             if ((truncated & signBit) != 0)
                 truncated |= ~upperMask; // Sign extend
         }
-        
+
         integer = truncated;
 
         // Compute changes
@@ -543,7 +521,7 @@ public struct InstructionParser
             changes |= CastingChanges.SignChanged;
 
         // Check for upper truncation
-        long upperBits = integer & ~upperMask;
+        long upperBits = original & ~upperMask;
         if (upperBits != 0 && upperBits != ~upperMask)
             changes |= CastingChanges.Truncated;
 
